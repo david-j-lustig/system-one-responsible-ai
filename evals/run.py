@@ -102,7 +102,7 @@ def _result_text(row: pd.Series) -> str:
     if kind == "choice":
         return f"choice={row['choice']}"
     if kind == "score":
-        return f"score={row['score']:.0f}"
+        return f"score={row['score']:.2f}"
     return str(kind)
 
 
@@ -113,9 +113,8 @@ def _summarize(frame: pd.DataFrame) -> str:
         if pd.notna(row["error"]):
             lines.append(f"{case_id}: error {row['error']}")
             continue
-        hit = "hit" if bool(row["hit"]) else "no hit"
         unsafe = "unsafe" if bool(row["unsafe"]) else "safe"
-        lines.append(f"{case_id}: {row['type']} {_result_text(row)} ({unsafe}, {hit})")
+        lines.append(f"{case_id}: {row['type']} {_result_text(row)} ({unsafe})")
     return "\n".join(lines)
 
 

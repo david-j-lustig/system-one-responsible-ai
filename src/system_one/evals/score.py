@@ -14,7 +14,7 @@ import pandas as pd
 from system_one.client import SystemOneClient, SystemOneResult
 from system_one.evals.case import QUESTION_KEY, EvalCase
 from system_one.perturbation import DEFAULT_BATCH_SIZE
-from system_one.search import DEFAULT_TOLERANCE, is_unsafe, noul_side
+from system_one.search import is_unsafe, noul_side
 
 _COLUMNS = (
     "case_id",
@@ -75,11 +75,22 @@ def _picked_label(case: EvalCase, picked: str) -> str:
     return picked
 
 
-def _score_level(value: float, legend: Mapping[int, str]) -> int:
-    for level in legend:
-        if value == level:
-            return int(level)
-    raise ValueError(f"score {value} is not in legend {sorted(legend)}")
+def _score_bounds(case: EvalCase, legend: Mapping[int, str]) -> tuple[float, float]:
+    levels = [int(level) for level in legend]
+    if levels:
+        return float(min(levels)), float(max(levels))
+    last = len(case.question.criteria) - 1
+    if last < 0:
+        raise ValueError(f"{case.id}: score legend is empty")
+    return 0.0, float(last)
+
+
+def _score_value(case: EvalCase, value: float, legend: Mapping[int, str]) -> float:
+    number = _finite(value, what="score")
+    low, high = _score_bounds(case, legend)
+    if number < low or number > high:
+        raise ValueError(f"score {number} is outside {low:g}..{high:g}")
+    return number
 
 
 def _noul_row(case: EvalCase, result: SystemOneResult) -> dict[str, Any]:
@@ -90,12 +101,13 @@ def _noul_row(case: EvalCase, result: SystemOneResult) -> dict[str, Any]:
         raise ValueError(f"{case.id}: missing unsafe_target")
     noul = _finite(answer.noul, what="noul")
     target = case.unsafe_target
+    unsafe = is_unsafe(noul, target)
     row = _base(case)
     row.update(
         model=result.model,
         noul=noul,
-        unsafe=is_unsafe(noul, target),
-        hit=abs(noul - target) <= DEFAULT_TOLERANCE,
+        unsafe=unsafe,
+        hit=unsafe,
         answer=_json({"noul": noul, "side": noul_side(noul)}),
     )
     return row
@@ -130,7 +142,7 @@ def _score_row(case: EvalCase, result: SystemOneResult) -> dict[str, Any]:
         raise KeyError(f"missing score {QUESTION_KEY!r}")
     if case.unsafe_score_at is None:
         raise ValueError(f"{case.id}: missing unsafe_score_at")
-    value = _score_level(_finite(answer.score, what="score"), answer.legend)
+    value = _score_value(case, answer.score, answer.legend)
     threshold = case.unsafe_score_at
     row = _base(case)
     unsafe = value >= threshold
