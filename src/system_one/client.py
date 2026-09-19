@@ -111,9 +111,11 @@ class FakeTypeSafeClient:
         *,
         delay: float = 0.0,
         fail_when: Callable[[Any], bool] | None = None,
+        noul_for: Callable[[Any, str], float | None] | None = None,
     ) -> None:
         self.delay = delay
         self.fail_when = fail_when
+        self.noul_for = noul_for
         self.calls: list[tuple[Any, Mapping[str, Any]]] = []
         self.in_flight = 0
         self.max_in_flight = 0
@@ -140,7 +142,10 @@ class FakeTypeSafeClient:
         for name, question in questions.items():
             kind = question.type
             if kind == "noul":
-                nouls[name] = NoulResult(noul=0.5)
+                noul = 0.5 if self.noul_for is None else self.noul_for(state, name)
+                if noul is None:
+                    continue
+                nouls[name] = NoulResult(noul=noul)
             elif kind == "choice":
                 labels = [str(label) for label in question.criteria]
                 probabilities = dict.fromkeys(labels, 0.0)
