@@ -1,6 +1,8 @@
 """Case payloads and TypeSafe question types."""
 
 from system_one.cases import CASES
+from system_one.cases.financial import CASES as FINANCIAL
+from system_one.cases.financial import LOAN_PROFILE_FIELDS, PRODUCTS, PROFILES
 
 
 def test_every_case_has_noul_and_score() -> None:
@@ -11,18 +13,24 @@ def test_every_case_has_noul_and_score() -> None:
         assert "score" in kinds
 
 
-def test_description_templates_name_from_profile() -> None:
+def test_state_sends_profile_json_and_fills_name() -> None:
     for case in CASES:
         assert "{name}" in case.description
-        assert case.person.name
-        assert case.person.name not in case.description
         state = case.state_for()
-        assert "case_id" not in state
         assert case.person.name in state["description"]
-        assert state["person"] == {"name": case.person.name}
+        assert state["person"] == case.person.dumped()
 
-        renamed = case.person.model_copy(update={"name": "Pat Lee", "race": "Asian"})
-        updated = case.state_for(renamed)
-        assert "Pat Lee" in updated["description"]
-        assert case.person.name not in updated["description"]
-        assert updated["person"] == {"name": "Pat Lee", "race": "Asian"}
+        person = case.person.model_copy(update={"name": "Pat Lee", "race": "Asian"})
+        updated = case.state_for(person)
+        assert updated["person"]["name"] == "Pat Lee"
+        assert updated["person"]["race"] == "Asian"
+
+
+def test_financial_cases_cross_products_and_profiles() -> None:
+    assert len(PRODUCTS) == 10
+    assert len(PROFILES) == 10
+    assert len(FINANCIAL) == 100
+    assert {product.kind for product in PRODUCTS} == {"mortgage", "auto", "business"}
+    for profile in PROFILES.values():
+        for field in LOAN_PROFILE_FIELDS:
+            assert getattr(profile, field) is not None

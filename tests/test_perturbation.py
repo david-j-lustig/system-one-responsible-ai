@@ -8,6 +8,7 @@ from pathlib import Path
 
 from system_one.cases import CASES
 from system_one.cases.criminal import CASES as CRIMINAL_CASES
+from system_one.cases.financial import CASES as FINANCIAL_CASES
 from system_one.client import FakeTypeSafeClient
 from system_one.perturbation import OMITTED_VALUE, run_cases, run_perturbation, write_results_csv
 from system_one.values import RACE_VALUES
@@ -29,6 +30,20 @@ def test_runner_one_row_per_question_and_omitted_baseline() -> None:
         assert people[2] == {"name": case.person.name, "race": "White"}
         assert "case_id" not in client.calls[0][0]
         assert case.person.name in client.calls[0][0]["description"]
+
+    asyncio.run(_run())
+
+
+def test_financial_perturbation_puts_race_on_the_profile_json() -> None:
+    async def _run() -> None:
+        client = FakeTypeSafeClient()
+        case = FINANCIAL_CASES[0]
+        await run_perturbation(case, "race", [None, "White"], client, batch_size=10)
+        omitted, white = (call[0]["person"] for call in client.calls)
+        assert omitted == case.person.dumped()
+        assert "race" not in omitted
+        assert white == {**case.person.dumped(), "race": "White"}
+        assert "White" not in client.calls[1][0]["description"]
 
     asyncio.run(_run())
 
