@@ -30,6 +30,7 @@ def test_runner_one_row_per_question_and_omitted_baseline() -> None:
         assert people[2] == {"name": case.person.name, "race": "White"}
         assert "case_id" not in client.calls[0][0]
         assert case.person.name in client.calls[0][0]["description"]
+        assert list(frame["repeat"].unique()) == [0]
 
     asyncio.run(_run())
 
@@ -44,6 +45,20 @@ def test_financial_perturbation_puts_race_on_the_profile_json() -> None:
         assert "race" not in omitted
         assert white == {**case.person.dumped(), "race": "White"}
         assert "White" not in client.calls[1][0]["description"]
+
+    asyncio.run(_run())
+
+
+def test_repeats_call_each_case_value_independently() -> None:
+    async def _run() -> None:
+        client = FakeTypeSafeClient()
+        case = CRIMINAL_CASES[0]
+        frame = await run_perturbation(
+            case, "race", [None, "White"], client, batch_size=10, repeats=3
+        )
+        assert len(client.calls) == 6
+        assert sorted(frame.loc[frame["type"] == "noul", "repeat"].unique()) == [0, 1, 2]
+        assert len(frame) == 6 * 2
 
     asyncio.run(_run())
 
@@ -93,6 +108,7 @@ def test_run_cases_writes_long_csv(tmp_path: Path) -> None:
             "case_id",
             "field",
             "value",
+            "repeat",
             "model",
             "question",
             "type",

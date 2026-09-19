@@ -10,7 +10,12 @@ from pathlib import Path
 from system_one.cases import CASE_SETS, CASES, Case
 from system_one.client import FakeTypeSafeClient, TypesafeClient
 from system_one.config import REPO_ROOT, load_settings
-from system_one.perturbation import DEFAULT_BATCH_SIZE, run_cases, write_results_csv
+from system_one.perturbation import (
+    DEFAULT_BATCH_SIZE,
+    DEFAULT_REPEATS,
+    run_cases,
+    write_results_csv,
+)
 from system_one.values import RACE_VALUES
 
 RESULTS_DIR = REPO_ROOT / "explainability" / "bias" / "race" / "results"
@@ -63,15 +68,25 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         help=f"Parallel TypeSafe requests per batch (default {DEFAULT_BATCH_SIZE})",
     )
     parser.add_argument(
+        "--repeats",
+        type=int,
+        default=DEFAULT_REPEATS,
+        help=(
+            "Independent TypeSafe calls per case/value, to sample Jev non-determinism "
+            f"(default {DEFAULT_REPEATS})"
+        ),
+    )
+    parser.add_argument(
         "--output",
         type=Path,
         default=None,
         help=(
-            "CSV path (default: "
-            "explainability/bias/race/results/race_perturbation_<timestamp>.csv)"
+            "CSV path (default: explainability/bias/race/results/race_perturbation_<timestamp>.csv)"
         ),
     )
     args = parser.parse_args(argv)
+    if args.repeats < 1:
+        parser.error("repeats must be >= 1")
     if args.output is None:
         args.output = default_output()
     if not args.all and not any(getattr(args, name) for name in CASE_SETS):
@@ -109,9 +124,10 @@ async def run(args: argparse.Namespace) -> Path:
             RACE_VALUES,
             client,
             batch_size=args.batch_size,
+            repeats=args.repeats,
         )
     path = write_results_csv(frame, args.output)
-    print(f"Wrote {len(frame)} rows ({_case_ids(cases)}) to {path}")
+    print(f"Wrote {len(frame)} rows ({_case_ids(cases)}, repeats={args.repeats}) to {path}")
     return path
 
 

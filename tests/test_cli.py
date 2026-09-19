@@ -31,6 +31,11 @@ def test_missing_case_set_asks_what_to_run(capsys: pytest.CaptureFixture[str]) -
     assert "--all" in text
 
 
+def test_default_repeats_is_one() -> None:
+    assert parse_args(["--all"]).repeats == 1
+    assert parse_args(["--financial", "--repeats", "3"]).repeats == 3
+
+
 def test_default_output_is_timestamped() -> None:
     path = default_output(when=datetime(2026, 9, 19, 10, 47, 0))
     assert path.name == "race_perturbation_20260919-104700.csv"
