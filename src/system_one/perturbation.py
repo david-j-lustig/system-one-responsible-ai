@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+from tqdm import tqdm
 
 from system_one.cases import Case
 from system_one.client import SystemOneClient, SystemOneResult
@@ -132,20 +133,32 @@ async def _run_jobs(
         raise ValueError("batch_size must be >= 1")
 
     rows: list[dict[str, Any]] = []
-    for chunk in batched(jobs, batch_size):
-        batch = list(chunk)
-        results = await asyncio.gather(
-            *[
-                client.system_one(state, case.questions)
-                for case, _field, _value, _repeat, state in batch
-            ],
-            return_exceptions=True,
-        )
-        for (case, field, value, repeat, _state), result in zip(batch, results, strict=True):
-            if isinstance(result, BaseException):
-                rows.append(_error_row(case.id, field, value, result, repeat=repeat))
-            else:
-                rows.extend(_rows(case.id, field, value, result, repeat=repeat))
+    chunks = list(batched(jobs, batch_size))
+    progress = tqdm(
+        total=len(jobs),
+        desc="TypeSafe",
+        unit="call",
+        disable=None,
+        leave=True,
+    )
+    try:
+        for chunk in chunks:
+            batch = list(chunk)
+            results = await asyncio.gather(
+                *[
+                    client.system_one(state, case.questions)
+                    for case, _field, _value, _repeat, state in batch
+                ],
+                return_exceptions=True,
+            )
+            for (case, field, value, repeat, _state), result in zip(batch, results, strict=True):
+                if isinstance(result, BaseException):
+                    rows.append(_error_row(case.id, field, value, result, repeat=repeat))
+                else:
+                    rows.extend(_rows(case.id, field, value, result, repeat=repeat))
+            progress.update(len(batch))
+    finally:
+        progress.close()
     return pd.DataFrame(rows, columns=_COLUMNS)
 
 

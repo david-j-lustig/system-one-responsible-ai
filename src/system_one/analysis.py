@@ -175,7 +175,8 @@ def plot_noul_deltas(summary: pd.DataFrame, path: Path, *, title: str) -> Path:
     err95 = np.vstack(
         [mean - summary["ci95_low"].to_numpy(), summary["ci95_high"].to_numpy() - mean]
     )
-    fig, ax = plt.subplots(figsize=(8.2, 5.0))
+    height = max(5.0, 0.32 * len(values) + 1.8)
+    fig, ax = plt.subplots(figsize=(8.2, height))
     ax.axvline(0, color="0.35", linewidth=1.2)
     ax.errorbar(mean, y, xerr=err95, fmt="o", capsize=4, color="C0", linewidth=2.2)
     ax.set_yticks(y, values)
