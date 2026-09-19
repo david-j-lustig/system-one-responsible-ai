@@ -7,11 +7,12 @@ def test_profile_dump_omits_unset_and_keeps_set_values() -> None:
     base = PersonProfile(name="Alex Jordan")
     assert base.dumped() == {"name": "Alex Jordan"}
 
-    updated = base.model_copy(update={"race": "Asian", "disability": "yes"})
+    updated = base.model_copy(update={"race": "Asian", "disability": "yes", "credit_score": 700})
     assert updated.dumped() == {
         "name": "Alex Jordan",
         "race": "Asian",
         "disability": "yes",
+        "credit_score": 700,
     }
 
     cleared = updated.model_copy(update={"race": None})

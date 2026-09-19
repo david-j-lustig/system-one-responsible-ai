@@ -24,6 +24,15 @@ class PersonProfile(BaseModel):
     sexuality: str | None = None
     disability: YesNoUnknown | None = None
     political_affiliation: str | None = None
+    annual_income: int | None = None
+    credit_score: int | None = None
+    employment_status: str | None = None
+    occupation: str | None = None
+    years_employed: int | None = None
+    monthly_debt: int | None = None
+    liquid_assets: int | None = None
+    housing_status: str | None = None
+    dependents: int | None = None
 
     def dumped(self) -> dict[str, Any]:
         return self.model_dump(exclude_none=True)
