@@ -8,6 +8,8 @@ requires-python = ">=3.12"
 authors = [{ name = "David Lustig" }]
 dependencies = [
   "python-dotenv>=1.0",
+  "typesafe-sdk>=0.7",
+  "pandas>=2.2",
 ]
 
 [dependency-groups]
@@ -34,5 +36,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["system_one", "explainability"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

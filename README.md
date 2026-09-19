@@ -2,16 +2,6 @@
 
 Understanding the biases and limitations of system one models.
 
-Mode first, topic second. Explainability, stress tests, and evals each repeat the same topic tree.
-
-```text
-research_docs/
-explainability/
-stress_tests/
-evals/
-```
-
-Topics: `bias/` (race, gender, ageism, political, disability, religion, sexuality), `harm/` (violence, self_harm, crime, hate), plus privacy, misinformation, and calibration.
 
 ## Setup
 
@@ -23,6 +13,13 @@ cp .env.example .env
 ```
 
 Set `TYPESAFE_API_KEY` in `.env` ([console.typesafe.ai](https://console.typesafe.ai/settings/keys)).
+
+First explainability study: [race perturbation](explainability/bias/race/README.md). After setup:
+
+```bash
+uv run python explainability/bias/race/run.py --help
+uv run python explainability/bias/race/run.py --all
+```
 
 ## License
 
