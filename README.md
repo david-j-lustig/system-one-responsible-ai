@@ -18,7 +18,8 @@ First explainability study: [race perturbation](explainability/bias/race/README.
 
 ```bash
 uv run python explainability/bias/race/run.py --help
-uv run python explainability/bias/race/run.py --all
+uv run python explainability/bias/race/run.py --financial --repeats 10
+uv run python explainability/bias/race/analyze.py
 uv run python stress_tests/harm/run.py --help
 uv run python stress_tests/harm/run.py --all
 uv run python stress_tests/harm/run.py --self-harm --mutate
