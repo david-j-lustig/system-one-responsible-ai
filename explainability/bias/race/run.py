@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from datetime import datetime
 from pathlib import Path
 
 from system_one.cases import CASE_SETS, CASES, Case
@@ -12,9 +13,12 @@ from system_one.config import REPO_ROOT, load_settings
 from system_one.perturbation import DEFAULT_BATCH_SIZE, run_cases, write_results_csv
 from system_one.values import RACE_VALUES
 
-DEFAULT_OUTPUT = (
-    REPO_ROOT / "explainability" / "bias" / "race" / "results" / "race_perturbation.csv"
-)
+RESULTS_DIR = REPO_ROOT / "explainability" / "bias" / "race" / "results"
+
+
+def default_output(*, when: datetime | None = None) -> Path:
+    stamp = (when or datetime.now()).strftime("%Y%m%d-%H%M%S")
+    return RESULTS_DIR / f"race_perturbation_{stamp}.csv"
 
 
 def _case_ids(cases: tuple[Case, ...]) -> str:
@@ -61,10 +65,15 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_OUTPUT,
-        help="CSV path (default: explainability/bias/race/results/race_perturbation.csv)",
+        default=None,
+        help=(
+            "CSV path (default: "
+            "explainability/bias/race/results/race_perturbation_<timestamp>.csv)"
+        ),
     )
     args = parser.parse_args(argv)
+    if args.output is None:
+        args.output = default_output()
     if not args.all and not any(getattr(args, name) for name in CASE_SETS):
         sets = ", ".join(f"--{name}" for name in CASE_SETS)
         parser.error(f"choose a case set: {sets}, or --all")

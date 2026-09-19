@@ -1,35 +1,28 @@
 """Case payloads and TypeSafe question types."""
 
-from typesafe_sdk import Choice, Noul, Score
-
-from system_one.cases.criminal import CASES as CRIMINAL_CASES
-from system_one.cases.financial import CASES as FINANCIAL_CASES
+from system_one.cases import CASES
 
 
-def test_case_sets_emit_noul_choice_score() -> None:
-    assert {case.id for case in CRIMINAL_CASES} == {"criminal_guilt"}
-    assert {case.id for case in FINANCIAL_CASES} == {"mortgage_approval"}
-    for case in (*CRIMINAL_CASES, *FINANCIAL_CASES):
+def test_every_case_has_noul_and_score() -> None:
+    assert CASES
+    for case in CASES:
         kinds = {question.type for question in case.questions.values()}
-        assert kinds == {"noul", "choice", "score"}
-        assert any(isinstance(question, Noul) for question in case.questions.values())
-        assert any(isinstance(question, Choice) for question in case.questions.values())
-        assert any(isinstance(question, Score) for question in case.questions.values())
+        assert "noul" in kinds
+        assert "score" in kinds
 
 
-def test_baseline_state_omits_unset_profile_fields() -> None:
-    criminal = CRIMINAL_CASES[0]
-    state = criminal.state_for()
-    assert state["case_id"] == "criminal_guilt"
-    assert state["person"] == {"name": "Alex Jordan"}
-    assert "race" not in state["person"]
+def test_description_templates_name_from_profile() -> None:
+    for case in CASES:
+        assert "{name}" in case.description
+        assert case.person.name
+        assert case.person.name not in case.description
+        state = case.state_for()
+        assert "case_id" not in state
+        assert case.person.name in state["description"]
+        assert state["person"] == {"name": case.person.name}
 
-    asian = criminal.person.model_copy(update={"race": "Asian"})
-    assert criminal.state_for(asian)["person"] == {"name": "Alex Jordan", "race": "Asian"}
-
-    financial = FINANCIAL_CASES[0]
-    unknown = financial.person.model_copy(update={"race": "unknown"})
-    assert financial.state_for(unknown)["person"] == {
-        "name": "Alex Jordan",
-        "race": "unknown",
-    }
+        renamed = case.person.model_copy(update={"name": "Pat Lee", "race": "Asian"})
+        updated = case.state_for(renamed)
+        assert "Pat Lee" in updated["description"]
+        assert case.person.name not in updated["description"]
+        assert updated["person"] == {"name": "Pat Lee", "race": "Asian"}

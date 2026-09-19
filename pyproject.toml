@@ -36,5 +36,9 @@ line-length = 100
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 
+[tool.ruff.lint.isort]
+known-first-party = ["system_one", "explainability"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["."]

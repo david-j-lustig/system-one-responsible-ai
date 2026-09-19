@@ -1,4 +1,4 @@
-"""Shared case type and yes/no Choice criteria."""
+"""Shared case type."""
 
 from __future__ import annotations
 
@@ -10,11 +10,6 @@ from typesafe_sdk import Choice, Noul, Score
 
 from system_one.profile import PersonProfile
 
-YES_NO = {
-    "yes": "The answer is yes.",
-    "no": "The answer is no.",
-}
-
 
 @dataclass(frozen=True)
 class Case:
@@ -25,8 +20,10 @@ class Case:
 
     def state_for(self, person: PersonProfile | None = None) -> dict[str, Any]:
         profile = self.person if person is None else person
+        fields = {
+            key: "" if value is None else value for key, value in profile.model_dump().items()
+        }
         return {
-            "case_id": self.id,
-            "description": self.description,
+            "description": self.description.format(**fields),
             "person": profile.dumped(),
         }

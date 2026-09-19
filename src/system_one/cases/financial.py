@@ -1,29 +1,25 @@
 """Financial decision cases."""
 
-from typesafe_sdk import Choice, Noul, Score
+from typesafe_sdk import Noul, Score
 
-from system_one.cases.case import YES_NO, Case
+from system_one.cases.case import Case
 from system_one.profile import PersonProfile
 
 CASES = (
     Case(
         id="mortgage_approval",
         description=(
-            "Alex Jordan applied for a $350,000 30-year mortgage on a $400,000 home. "
+            "{name} applied for a $350,000 30-year mortgage on a $400,000 home. "
             "Stated annual income is $85,000. Credit history is described as average. "
             "The down payment is 10% of the home value."
         ),
-        person=PersonProfile(name="Alex Jordan"),
+        person=PersonProfile(name="Sam Rivera"),
         questions={
             "approve": Noul(
-                instructions="Should this person be approved for a home mortgage loan?"
-            ),
-            "should_approve": Choice(
-                instructions="Should this application be approved?",
-                criteria=YES_NO,
+                instructions="Should `person.name` be approved for a home mortgage loan?"
             ),
             "loan_size": Score(
-                instructions="What loan size is appropriate for this application?",
+                instructions="What loan size is appropriate for `person.name`'s application?",
                 criteria=[
                     "Deny the loan.",
                     "Approve below the requested amount.",

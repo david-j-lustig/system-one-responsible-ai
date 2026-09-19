@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
-from typesafe_sdk import Choice, Noul, Score
+from typesafe_sdk import AsyncTypeSafeClient
 
 
 @dataclass(frozen=True)
@@ -26,6 +26,8 @@ class ChoiceResult:
 class ScoreResult:
     score: float
     confidence: float
+    legend: dict[int, str]
+    probabilities: dict[int, float]
 
 
 @dataclass(frozen=True)
@@ -47,22 +49,26 @@ class SystemOneClient(Protocol):
 def result_from_sdk(response: Any) -> SystemOneResult:
     nouls = {
         name: NoulResult(noul=float(answer.noul))
-        for name, answer in dict(getattr(response, "nouls", None) or {}).items()
+        for name, answer in dict(response.nouls).items()
     }
     choices = {
         name: ChoiceResult(
             choice=str(answer.choice),
-            probabilities=dict(getattr(answer, "probabilities", None) or {}),
+            probabilities=dict(answer.probabilities),
             confidence=float(answer.confidence),
         )
-        for name, answer in dict(getattr(response, "choices", None) or {}).items()
+        for name, answer in dict(response.choices).items()
     }
     scores = {
         name: ScoreResult(
             score=float(answer.score),
             confidence=float(answer.confidence),
+            legend={int(level): str(label) for level, label in dict(answer.legend).items()},
+            probabilities={
+                int(level): float(prob) for level, prob in dict(answer.probabilities).items()
+            },
         )
-        for name, answer in dict(getattr(response, "scores", None) or {}).items()
+        for name, answer in dict(response.scores).items()
     }
     return SystemOneResult(model=str(response.model), nouls=nouls, choices=choices, scores=scores)
 
@@ -73,11 +79,9 @@ class TypesafeClient:
     def __init__(self, *, api_key: str | None = None, model: str | None = None) -> None:
         self._api_key = api_key
         self._model = model
-        self._client: Any = None
+        self._client: AsyncTypeSafeClient | None = None
 
     async def __aenter__(self) -> TypesafeClient:
-        from typesafe_sdk import AsyncTypeSafeClient
-
         kwargs: dict[str, Any] = {}
         if self._api_key:
             kwargs["api_key"] = self._api_key
@@ -99,46 +103,17 @@ class TypesafeClient:
         return result_from_sdk(response)
 
 
-def _question_type(question: Any) -> str:
-    if isinstance(question, dict):
-        return str(question["type"])
-    return str(question.type)
-
-
-def _choice_criteria(question: Any) -> Mapping[str, Any]:
-    if isinstance(question, dict):
-        return question["criteria"]
-    return question.criteria
-
-
-def _score_criteria(question: Any) -> list[Any]:
-    if isinstance(question, dict):
-        return list(question["criteria"])
-    return list(question.criteria)
-
-
-def _noul_for_race(race: object) -> float:
-    if race is None:
-        return 0.50
-    lookup = {
-        "unknown": 0.48,
-        "White": 0.40,
-        "Black or African American": 0.70,
-        "Asian": 0.45,
-        "Hispanic or Latino": 0.55,
-        "American Indian or Alaska Native": 0.52,
-        "Native Hawaiian or Other Pacific Islander": 0.47,
-    }
-    if isinstance(race, str) and race in lookup:
-        return lookup[race]
-    return 0.50
-
-
 class FakeTypeSafeClient:
-    """Deterministic client keyed by `state['person']['race']`. No network."""
+    """Deterministic in-memory client. No network."""
 
-    def __init__(self, *, delay: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        delay: float = 0.0,
+        fail_when: Callable[[Any], bool] | None = None,
+    ) -> None:
         self.delay = delay
+        self.fail_when = fail_when
         self.calls: list[tuple[Any, Mapping[str, Any]]] = []
         self.in_flight = 0
         self.max_in_flight = 0
@@ -155,37 +130,37 @@ class FakeTypeSafeClient:
         self.max_in_flight = max(self.max_in_flight, self.in_flight)
         if self.delay:
             await asyncio.sleep(self.delay)
-        else:
-            await asyncio.sleep(0)
         self.in_flight -= 1
-
-        person = state.get("person") if isinstance(state, dict) else {}
-        race = person.get("race") if isinstance(person, dict) else None
-        noul = _noul_for_race(race)
-        p_yes = noul
-        p_no = 1.0 - noul
-        choice = "yes" if noul >= 0.5 else "no"
-        confidence = abs(noul - 0.5) * 2
+        if self.fail_when is not None and self.fail_when(state):
+            raise RuntimeError("fake client failure")
 
         nouls: dict[str, NoulResult] = {}
         choices: dict[str, ChoiceResult] = {}
         scores: dict[str, ScoreResult] = {}
         for name, question in questions.items():
-            kind = _question_type(question)
-            if kind == "noul" or isinstance(question, Noul):
-                nouls[name] = NoulResult(noul=noul)
-            elif kind == "choice" or isinstance(question, Choice):
-                probabilities = {str(label): 0.0 for label in _choice_criteria(question)}
-                probabilities["yes"] = p_yes
-                probabilities["no"] = p_no
+            kind = question.type
+            if kind == "noul":
+                nouls[name] = NoulResult(noul=0.5)
+            elif kind == "choice":
+                labels = [str(label) for label in question.criteria]
+                probabilities = dict.fromkeys(labels, 0.0)
+                pick = labels[0] if labels else "yes"
+                probabilities[pick] = 1.0
                 choices[name] = ChoiceResult(
-                    choice=choice,
+                    choice=pick,
                     probabilities=probabilities,
-                    confidence=confidence,
+                    confidence=1.0,
                 )
-            elif kind == "score" or isinstance(question, Score):
-                levels = max(len(_score_criteria(question)) - 1, 0)
-                scores[name] = ScoreResult(score=noul * levels, confidence=confidence)
+            elif kind == "score":
+                legend = {index: str(label) for index, label in enumerate(question.criteria)}
+                n = len(legend) or 1
+                probabilities = {index: 1.0 / n for index in legend}
+                scores[name] = ScoreResult(
+                    score=1.0,
+                    confidence=0.5,
+                    legend=legend,
+                    probabilities=probabilities,
+                )
             else:
                 raise ValueError(f"Unknown question type: {kind}")
         return SystemOneResult(model="fake", nouls=nouls, choices=choices, scores=scores)
